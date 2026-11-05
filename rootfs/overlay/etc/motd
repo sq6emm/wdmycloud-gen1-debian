@@ -1,0 +1,4 @@
+
+  WD My Cloud (gen1) running Debian 13 -- https://github.com/sq6emm/wdmycloud-gen1-debian
+  status page: http://<this host>/    backup target: rsync://<this host>/backup/    data: /srv/data
+

@@ -1,0 +1,4 @@
+/dev/md0   /          ext3  defaults,noatime   0 1
+/dev/sda3  none       swap  sw                 0 0
+/dev/sda4  /srv/data  ext4  defaults,noatime   0 2
+proc       /proc      proc  defaults           0 0

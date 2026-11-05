@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily rsync snapshot backup to WD My Cloud
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

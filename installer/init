@@ -1,0 +1,93 @@
+#!/bin/sh
+# WD My Cloud gen1 installer (PID 1 of installer.uRamdisk). Busybox ash: no $((arith)), keep it simple.
+# Expects on the data partition (/dev/sda4): wdmycloud-install/{rootfs.img.xz,boot.scr,SHA256SUMS}.
+# Writes rootfs.img.xz to /dev/md0 (the stock 2 GB RAID1 root), boot.scr to partition 7, then reboots.
+# On any failure it stays up with a telnet root shell (no password) so the box is never left unreachable.
+mkdir -p /dev /proc /sys /tmp /mnt/data /mnt/root
+[ -c /dev/console ] || mknod /dev/console c 5 1
+[ -c /dev/null ] || mknod /dev/null c 1 3
+exec </dev/console >/dev/console 2>&1
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || mdev -s
+mkdir -p /dev/pts
+LOG=/tmp/install.log
+log() { echo "[installer] $*"; echo "$(date '+%T') $*" >> $LOG; }
+
+rescue() {
+	echo "[installer] ===== RESCUE SHELL ====="
+	[ -f /etc/passwd ] || echo "root::0:0:root:/:/bin/sh" > /etc/passwd
+	grep -qs ' /dev/pts ' /proc/mounts || mount -t devpts devpts /dev/pts
+	ifconfig lo 127.0.0.1 up 2>/dev/null
+	iface=""
+	for netdev in /sys/class/net/*; do
+		c=${netdev##*/}; [ "$c" = "lo" ] && continue; [ -e "$netdev/device" ] || continue; iface=$c; break
+	done
+	if [ -n "$iface" ]; then
+		ifconfig "$iface" up 2>/dev/null
+		udhcpc -i "$iface" -s /etc/udhcpc.script -t 10 -T 2 -A 3 -n -q 2>/dev/null
+		addr=$(ifconfig "$iface" 2>/dev/null | grep 'inet addr:'); addr=${addr#*inet addr:}; addr=${addr%% *}
+		[ -z "$addr" ] && { ifconfig "$iface" 192.168.1.222 netmask 255.255.255.0 up; addr=192.168.1.222; }
+		telnetd -l /bin/sh 2>/dev/null &
+		echo "[installer] telnet $addr  (root shell, no password). Log: $LOG"
+	fi
+	while true; do sleep 3600; done
+}
+fail() { log "FAILED: $*"; rescue; }
+
+log "installer starting, cmdline: $(cat /proc/cmdline)"
+for ko in /lib/modules/phy-ls1024a-serdes.ko /lib/modules/usb-storage.ko /lib/modules/uas.ko; do
+	[ -f "$ko" ] && insmod "$ko" 2>/dev/null
+done
+log "waiting for the SATA disk"
+found=""
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+	[ -b /dev/sda8 ] && { found=yes; break; }
+	sleep 1
+done
+[ -n "$found" ] || fail "no /dev/sda with 8 partitions"
+cat /proc/partitions
+
+log "assembling /dev/md0 from sda1+sda2"
+mdadm --assemble --run /dev/md0 /dev/sda1 /dev/sda2 >/dev/null 2>&1 || mdadm --assemble --scan --auto=yes >/dev/null 2>&1
+[ -b /dev/md0 ] || fail "/dev/md0 did not assemble"
+MDSIZE=$(cat /sys/block/md0/size)
+log "md0 size: $MDSIZE sectors"
+
+mount -o rw /dev/sda4 /mnt/data || fail "cannot mount /dev/sda4 (data partition)"
+D=/mnt/data/wdmycloud-install
+[ -f "$D/rootfs.img.xz" ] || fail "$D/rootfs.img.xz not found"
+cd "$D"
+grep -E ' (rootfs\.img\.xz|boot\.scr)$' SHA256SUMS > /tmp/sums || fail "SHA256SUMS lacks rootfs.img.xz/boot.scr"
+log "verifying checksums"
+sha256sum -c /tmp/sums || fail "checksum mismatch"
+IMGSIZE=$(xzcat rootfs.img.xz 2>/dev/null | wc -c)
+log "rootfs image: $IMGSIZE bytes"
+# md0 is 1999808 KiB on a stock disk; the image is built to exactly that size.
+EXPECT=$(cat /sys/block/md0/size)
+case "$EXPECT" in
+	3999616) ;;
+	*) log "WARNING: md0 is $EXPECT sectors, not the stock 3999616; the image is written anyway" ;;
+esac
+
+log "writing rootfs.img.xz to /dev/md0 (takes ~3 minutes)"
+xzcat rootfs.img.xz | dd of=/dev/md0 bs=1M conv=fsync 2>/tmp/dd.err || fail "dd to /dev/md0: $(cat /tmp/dd.err)"
+sync
+mount -t ext3 -o ro /dev/md0 /mnt/root || fail "the new root filesystem does not mount"
+grep PRETTY_NAME /mnt/root/etc/os-release || fail "no /etc/os-release on the new root"
+umount /mnt/root
+
+log "writing boot.scr to /dev/sda7"
+dd if=boot.scr of=/dev/sda7 bs=1M conv=fsync 2>/dev/null || fail "dd to /dev/sda7"
+cmp -n "$(stat -c %s boot.scr)" boot.scr /dev/sda7 || fail "boot.scr verify"
+
+log "done; moving $D to wdmycloud-install.done"
+cd /
+cp $LOG "$D/install.log" 2>/dev/null
+mv "$D" /mnt/data/wdmycloud-install.done 2>/dev/null
+umount /mnt/data
+mdadm --stop /dev/md0 >/dev/null 2>&1
+sync
+log "rebooting into Debian"
+sleep 2
+reboot -f

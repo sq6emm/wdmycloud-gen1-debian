@@ -1,0 +1,12 @@
+[Unit]
+Description=NAS status web page (http://nas/)
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/nas-status.py
+Restart=always
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

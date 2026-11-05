@@ -1,0 +1,16 @@
+# Options applied with scripts/config on top of ls1024a_defconfig.
+# The SerDes PHY must be built in: with root on SATA and no initrd, a module can never be loaded before the
+# SATA controller's deferred probe needs it (the port keeps it as a module for its own initrd-based boot).
+--enable PHY_LS2014A_SERDES
+--enable PHY_LS2014A_USB3
+# A NAS is a server: no full preemption, no memory/blkio cgroup accounting on the page-cache write path
+# (measured: ext4 buffered writes 40 -> 56 MB/s on this CPU), irq time accounting for visibility.
+--disable PREEMPT
+--disable PREEMPT_VOLUNTARY
+--enable PREEMPT_NONE
+--disable MEMCG
+--disable BLK_CGROUP
+--disable CGROUP_WRITEBACK
+--enable IRQ_TIME_ACCOUNTING
+--disable SLUB_DEBUG
+--disable SLUB_DEBUG_ON

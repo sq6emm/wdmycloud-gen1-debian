@@ -1,0 +1,112 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NAS</title><style>
+:root{--bg:#f4f5f7;--card:#fff;--fg:#1c1e21;--mut:#6b7280;--ok:#15803d;--warn:#b45309;--bad:#b91c1c;--line:#2563eb;--line2:#059669;--bar:#e5e7eb;--okbg:#dcfce7;--warnbg:#fef3c7;--badbg:#fee2e2;--infobg:#dbeafe}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b22;--fg:#e6e8eb;--mut:#9aa3b2;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--line:#60a5fa;--line2:#34d399;--bar:#2a2f3a;--okbg:#14532d;--warnbg:#78350f;--badbg:#7f1d1d;--infobg:#1e3a8a}}
+*{box-sizing:border-box}body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif}
+h1{font-size:20px;margin:0 0 4px}h1 small{color:var(--mut);font-weight:400;font-size:14px;margin-left:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-top:12px}
+.card{background:var(--card);border-radius:10px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.08)}.wide{grid-column:1/-1}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
+.big{font-size:26px;font-weight:600}.row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-top:1px solid var(--bar)}
+.row:first-of-type{border-top:0}.mut{color:var(--mut)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.bar{height:8px;background:var(--bar);border-radius:4px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--line)}
+svg{width:100%;height:46px;display:block;margin-top:6px}.leg{font-size:12px;color:var(--mut)}
+#alerts{margin-top:10px;border-radius:10px;padding:10px 14px;font-weight:500}#alerts.ok{background:var(--okbg)}#alerts.warn{background:var(--warnbg)}#alerts.crit{background:var(--badbg)}
+#alerts ul{margin:4px 0 0;padding-left:20px;font-weight:400}#alerts li.info{color:var(--mut)}
+#err{color:var(--bad);display:none}a{color:var(--line)}code{font-size:13px}pre{font:12px/1.3 ui-monospace,monospace;white-space:pre-wrap;word-break:break-all;margin:0;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:14px}td{padding:2px 0;border-top:1px solid var(--bar)}td:last-child{text-align:right}
+.tabs button{background:none;border:1px solid var(--bar);color:var(--fg);border-radius:6px;padding:2px 8px;cursor:pointer;font:12px system-ui;text-transform:none;letter-spacing:0}.tabs button.on{background:var(--line);color:#fff;border-color:var(--line)}
+.chart svg{height:120px}.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+</style></head><body>
+<h1>NAS <small id="sub"></small></h1><div id="err">no connection to the NAS…</div>
+<div id="alerts"></div>
+<div class="grid" id="g"></div>
+<div class="card wide" style="margin-top:12px"><h2><span>History</span><span class="tabs"><button id="t24" class="on">24 h</button> <button id="t7">7 days</button></span></h2><div class="charts" id="charts"></div></div>
+<script>
+const MB=1048576,GB=1073741824,L='en-GB';let range='24h',lastHist=null;
+const fmtB=b=>b>=GB*1000?(b/GB/1024).toFixed(2)+' TB':b>=GB?(b/GB).toFixed(1)+' GB':b>=MB?(b/MB).toFixed(0)+' MB':(b/1024).toFixed(0)+' kB';
+const rate=b=>b==null?'–':(b/MB).toFixed(b<MB?2:1)+' MB/s';
+const dur=s=>{const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+h+'h '+m+'m'};
+const ago=t=>t==null?'never':dur(Math.max(0,Date.now()/1000-t))+' ago';
+const ts=t=>new Date(t*1000).toLocaleString(L);
+function spark(a,b,label,pct){const w=300,h=46,n=Math.max(a.length,2),mx=Math.max(1,...a,...(b||[]));
+ const pts=s=>s.map((v,i)=>(i*w/(n-1)).toFixed(1)+','+(h-2-(v/mx)*(h-4)).toFixed(1)).join(' ');
+ return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="var(--line)" stroke-width="1.5" points="${pts(a)}"/>${b?`<polyline fill="none" stroke="var(--line2)" stroke-width="1.5" points="${pts(b)}"/>`:''}</svg><div class="leg">${label} · last 10 min, peak ${pct?mx.toFixed(0)+'%':rate(mx)}</div>`}
+function tempSpark(h){const t=h.temp.map(v=>v==null?null:v),vals=t.filter(v=>v!=null),w=300,hh=46,n=Math.max(t.length,2),lo=Math.min(...vals)-2,hi=Math.max(...vals)+2;
+ let d='',pen=false;t.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+(i*w/(n-1)).toFixed(1)+','+(hh-2-(v-lo)/(hi-lo)*(hh-4)).toFixed(1)+' ';pen=true});
+ const y55=hh-2-(55-lo)/(hi-lo)*(hh-4);return `<svg viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none">${y55>0&&y55<hh?`<line x1="0" x2="${w}" y1="${y55.toFixed(1)}" y2="${y55.toFixed(1)}" stroke="var(--bad)" stroke-dasharray="4 4"/>`:''}<path d="${d}" fill="none" stroke="var(--line)" stroke-width="1.5"/></svg><div class="leg">temperature, last ${range=='7d'?'7 days':'24 h'}: min ${Math.min(...vals)}° · max ${Math.max(...vals)}° (dashed = 55°)</div>`}
+const agoH=h=>h<48?h+' h of disk time ago':h<24*60?Math.round(h/24)+' days of disk time ago':(h/24/365).toFixed(1)+' years of disk time ago';
+function card(t,body,cls){return `<div class="card ${cls||''}"><h2><span>${t}</span></h2>${body}</div>`}
+function row(k,v,c){return `<div class="row"><span class="mut">${k}</span><span class="${c||''}">${v}</span></div>`}
+function fs(f){if(!f)return '–';const c=f.pct>90?'bad':f.pct>80?'warn':'';return `<div class="big ${c}">${f.pct}%</div><div class="bar"><i style="width:${f.pct}%"></i></div>`+row('used',fmtB(f.used))+row('free',fmtB(f.free))+row('total',fmtB(f.total))+row('inodes used',f.inodes_used.toLocaleString(L)+' / '+f.inodes_total.toLocaleString(L))}
+function render(d){
+ document.getElementById('sub').textContent=`${d.host} · ${d.kernel} · up ${dur(d.uptime)} · ${ts(d.time)}`;
+ const al=document.getElementById('alerts'),lv=d.alerts.some(a=>a.level=='crit')?'crit':d.alerts.some(a=>a.level=='warn')?'warn':'ok';
+ al.className=lv;al.innerHTML=(lv=='ok'?'All good':lv=='crit'?'Attention needed':'Warnings')+(d.alerts.length?'<ul>'+d.alerts.map(a=>`<li class="${a.level}">${a.text}</li>`).join('')+'</ul>':'');
+ const n=d.now,H=d.hist,sm=d.smart||{},A=sm.attrs||{},raw=k=>A[k]?A[k].raw:'–';
+ const tc=sm.temp==null?'':sm.temp>=55?'bad':sm.temp>=50?'warn':'ok';
+ const bad=['Reallocated_Sector_Ct','Current_Pending_Sector','Offline_Uncorrectable'].some(k=>A[k]&&A[k].raw>0);
+ const md=Object.entries(d.md).map(([k,v])=>row(k+' '+v.level,`[${v.disks}] ${v.sync||v.sync_action||''}`,v.disks.includes('_')?'bad':'ok')+row(k+' mismatch / last check',`${v.mismatch_cnt} / ${v.last_sync_action||'–'}`,v.mismatch_cnt>0?'warn':'')).join('');
+ const e4=Object.entries(d.ext4_errors).map(([k,v])=>row('ext4 errors '+k,v,v>0?'bad':'ok')).join('');
+ const st=sm.selftest,stc=!st||st.type=='none'?'mut':/without error|in progress/i.test(st.status)?'ok':/interrupted|aborted/i.test(st.status)?'mut':'bad';
+ const c=d.chrony,ops=d.nfs.ops||{},opn=['WRITE','READ','GETATTR','LOOKUP','OPEN','CLOSE','SETATTR','CREATE','LINK','REMOVE','RENAME','READDIR','ACCESS','COMMIT'].filter(k=>k in ops);
+ const g=[
+  card('Device and firmware',(dv=>dv.model?`<div class="big" style="font-size:18px">${dv.model}</div>`
+   +row('SoC',`${dv.soc||'–'} (Mindspeed Comcerto 2000), ${dv.cpu||''}`)+row('RAM · L2 cache',`${dv.ram?fmtB(dv.ram):'–'} · ${dv.l2||'–'}`)
+   +row('disk',`${sm['Device Model']||'–'}${sm['Serial Number']?', s/n '+sm['Serial Number']:''}${sm['User Capacity']?', '+sm['User Capacity'].replace(/.*\[(.*)\].*/,'$1'):''}`)
+   +row('MAC',dv.mac||'–')+row('bootloader',dv.bootloader||'barebox 2011.06 (WD, in SPI NOR)')
+   +row('kernel',`${dv.kernel} <span class="mut">${dv.kernel_build||''}</span>`)+row('image on sda5',dv.uimage?`${dv.uimage} (${fmtB(dv.uimage_size)})`:'–')+row('OS',dv.os||'–')
+   +row('firmware',`<a href="${dv.repo}">${dv.repo.replace('https://github.com/','')}</a>`)
+   +row('how to update / recover',`<a href="${dv.repo}/blob/${dv.branch}/docs/INSTALL.md">INSTALL.md</a> · <a href="${dv.repo}/blob/${dv.branch}/docs/RECOVERY.md">RECOVERY.md</a>`):'<span class="mut">reading…</span>')(d.device||{}),'wide'),
+  card('Data /srv/data',fs(d.fs.data)+(e4.includes('sda4')?row('ext4 errors',d.ext4_errors.sda4,d.ext4_errors.sda4>0?'bad':'ok'):'')),
+  card('System /',fs(d.fs.root)+md+row('swap used',fmtB(d.mem.swap_used)+' of '+fmtB(d.mem.swap_total))),
+  card('Disk SMART',`<div class="big ${sm.health=='PASSED'&&!bad?'ok':'bad'}">${sm.health||'…'}${sm.temp!=null?` <span class="${tc}">${sm.temp}°C</span>`:''}</div>`
+   +(lastHist&&lastHist.temp.filter(x=>x!=null).length>1?tempSpark(lastHist):'')
+   +row('model',(sm['Device Model']||'–'))+row('drive state',d.disk_power||'–',d.disk_power=='active/idle'?'':'mut')+row('power-on hours',(raw('Power_On_Hours')).toLocaleString(L))
+   +row('reallocated sectors',raw('Reallocated_Sector_Ct'),A.Reallocated_Sector_Ct&&A.Reallocated_Sector_Ct.raw>0?'bad':'ok')
+   +row('pending sectors',raw('Current_Pending_Sector'),A.Current_Pending_Sector&&A.Current_Pending_Sector.raw>0?'bad':'ok')+row('offline uncorrectable',raw('Offline_Uncorrectable'))+row('UDMA CRC errors',raw('UDMA_CRC_Error_Count'),A.UDMA_CRC_Error_Count&&A.UDMA_CRC_Error_Count.raw>0?'warn':'')
+   +row('start/stop · load cycles',raw('Start_Stop_Count')+' · '+raw('Load_Cycle_Count'))
+   +row('smartd',(d.smartd&&d.smartd.running)?('running'+(d.smartd.schedule?', tests '+d.smartd.schedule.replace('L/../../7/09','long Sun 09:00').replace('S/../.././12','short daily 12:00').replace('|',' + '):'')):'NOT running',(d.smartd&&d.smartd.running)?'ok':'warn')
+   +row('smartd warnings',d.smartd&&d.smartd.total?`${d.smartd.total} (${d.smartd.recent} in 7 d)`:'none',d.smartd&&d.smartd.recent?'bad':'ok')
+   +row('last self-test',st?`${st.type}: ${st.status}${st.hours!=null&&A.Power_On_Hours?' ('+agoH(A.Power_On_Hours.raw-st.hours)+')':''}`:'–',stc)+row('temperature read · full SMART read',(d.temp_age!=null?d.temp_age+' s':'–')+' · '+(d.smart_age!=null?d.smart_age+' s ago':'–'))),
+  card('System health',`<div class="big ${d.failed_units.length?'bad':'ok'}">${d.failed_units.length?d.failed_units.length+' failed unit(s)':'services OK'}</div>`
+   +(d.failed_units.length?row('failed',d.failed_units.join(', '),'bad'):'')
+   +row('clock (chrony)',c.synced?`synced, offset ${c.offset!=null?(c.offset*1000).toFixed(1)+' ms':'?'}${c.source?' via '+c.source:''}`:'NOT synchronised',c.synced?'ok':'warn')
+   +row('boots in journal',d.boot.boots??'…')+row('last reboot',d.boot.last_planned==null?'unknown':d.boot.last_planned?'clean shutdown':'crash / power loss',d.boot.last_planned===false?'warn':'')
+   +`<div class="row" style="display:block"><span class="mut">kernel warnings this boot</span><pre>${(d.kernel_warnings.length?d.kernel_warnings:['none']).map(x=>x.replace(/</g,'&lt;')).join('\n')}</pre></div>`),
+  card('CPU and memory',`<div class="big">${n.cpu!=null?n.cpu+'%':'–'}</div>`+spark(H.cpu,H.softirq,'total CPU (blue), network softirq (green)',true)
+   +row('load 1/5/15',d.load.map(x=>x.toFixed(2)).join(' / '))+row('RAM available',fmtB(d.mem.available)+' of '+fmtB(d.mem.total))+row('dirty pages',fmtB(d.mem.dirty))
+   +`<table style="margin-top:8px">${(d.top.length?d.top:[]).map(p=>`<tr><td class="mut">${p.comm} <span class="mut" style="font-size:12px">${p.pid}</span></td><td>${p.cpu}%</td></tr>`).join('')||'<tr><td class="mut">idle</td><td></td></tr>'}</table>`),
+  card('Disk I/O',`<div class="big">${rate(n.wr)} <span class="mut" style="font-size:14px">write</span></div>`+spark(H.wr,H.rd,'write (blue), read (green)')
+   +row('read',rate(n.rd))+row('utilisation',n.util!=null?n.util+'%':'–',n.util>90?'warn':'')),
+  card('Network eth0',`<div class="big">${rate(n.rx)} <span class="mut" style="font-size:14px">receive</span></div>`+spark(H.rx,H.tx,'receive (blue), transmit (green)')
+   +row('transmit',rate(n.tx))+row('packets/s rx · tx',`${n.rxp!=null?n.rxp.toFixed(0):'–'} · ${n.txp!=null?n.txp.toFixed(0):'–'}`)
+   +row('link',d.link.operstate=='up'?`${d.link.speed} Mb/s ${d.link.duplex}, MTU ${d.link.mtu}`:'DOWN',d.link.operstate=='up'&&d.link.speed=='1000'?'ok':'warn')
+   +row('errors rx · tx',`${d.net_err.rx_errors??'–'} · ${d.net_err.tx_errors??'–'}`,(d.net_err.rx_errors||d.net_err.tx_errors)?'warn':'ok')+row('drops rx · tx',`${d.net_err.rx_dropped??'–'} · ${d.net_err.tx_dropped??'–'}`,(d.net_err.rx_dropped||d.net_err.tx_dropped)?'warn':'ok')),
+  card('Backup (rsync daemon)',(rd=>`<div class="big ${rd.active?'ok':'bad'}">${rd.active?'listening on 873':'NOT running'}</div>`
+   +row('active transfers',rd.transfers&&rd.transfers.length?rd.transfers.join(', '):'none')+row('last request',rd.last_request?rd.last_request.replace(/^\S+ \S+ \[\d+\] /,''):'–')
+   +row('snapshots',(rd.snapshots||[]).length?`${rd.snapshots.filter(x=>!x.endsWith('.incomplete')).length} complete, ${rd.snapshots.filter(x=>x.endsWith('.incomplete')).length} in progress`:'none')+row('latest',rd.latest||'–')
+   +`<div class="row" style="display:block"><span class="mut">finalize log</span><pre>${(rd.finalize&&rd.finalize.length?rd.finalize:['nothing finalized yet']).map(x=>x.replace(/</g,'&lt;')).join('\n')}</pre></div>`)(d.rsyncd||{})),
+ ];
+ document.getElementById('g').innerHTML=g.join('');
+}
+function chart(t,series,title,fmt,fixedMax){const w=600,h=120,pl=46,pt=6,pb=16;const n=t.length;if(n<2)return `<div class="chart"><div class="leg">${title}: not enough data yet</div></div>`;
+ const vals=series.flatMap(s=>s.v.filter(x=>x!=null));const mx=fixedMax||Math.max(1,...vals),x0=t[0],x1=t[n-1];
+ const X=i=>pl+(t[i]-x0)/(x1-x0)*(w-pl-4),Y=v=>pt+(1-v/mx)*(h-pt-pb);
+ const line=s=>{let d='',pen=false;s.v.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+','+Y(v).toFixed(1)+' ';pen=true});return `<path d="${d}" fill="none" stroke="${s.c}" stroke-width="1.5"/>`};
+ const ticks=[];const span=x1-x0,step=span>2*86400?86400:span>6*3600?6*3600:3600;for(let k=Math.ceil(x0/step)*step;k<=x1;k+=step){const d=new Date(k*1000);ticks.push(`<text x="${(pl+(k-x0)/(x1-x0)*(w-pl-4)).toFixed(1)}" y="${h-3}" font-size="10" text-anchor="middle" fill="var(--mut)">${step>=86400?d.toLocaleDateString(L,{day:'2-digit',month:'2-digit'}):d.getHours()+':00'}</text>`)}
+ const grid=[0,.5,1].map(f=>`<line x1="${pl}" x2="${w-4}" y1="${Y(mx*f).toFixed(1)}" y2="${Y(mx*f).toFixed(1)}" stroke="var(--bar)"/><text x="${pl-4}" y="${(Y(mx*f)+4).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--mut)">${fmt(mx*f)}</text>`).join('');
+ return `<div class="chart"><div class="leg">${title}${series.length>1?' · '+series.map(s=>`<span style="color:${s.c}">■</span> ${s.n}`).join(' '):''}</div><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}${series.map(line).join('')}${ticks.join('')}</svg></div>`}
+async function history(){try{const r=await fetch('/api/history?range='+range,{cache:'no-store'});const h=await r.json();lastHist=h;const B='var(--line)',G='var(--line2)';
+ document.getElementById('charts').innerHTML=[
+  chart(h.t,[{v:h.temp,c:B,n:'°C'}],'Disk temperature',v=>v.toFixed(0)+'°',Math.max(60,...h.temp.filter(x=>x!=null))),
+  chart(h.t,[{v:h.data_pct,c:B,n:'%'}],'Data volume used',v=>v.toFixed(0)+'%',100),
+  chart(h.t,[{v:h.nfs_w,c:B,n:'write'},{v:h.nfs_r,c:G,n:'read'}],'NFS throughput',v=>(v/MB).toFixed(0)+' MB/s'),
+  chart(h.t,[{v:h.rx,c:B,n:'rx'},{v:h.tx,c:G,n:'tx'}],'Network',v=>(v/MB).toFixed(0)+' MB/s'),
+  chart(h.t,[{v:h.wr,c:B,n:'write'},{v:h.rd,c:G,n:'read'}],'Disk I/O',v=>(v/MB).toFixed(0)+' MB/s'),
+  chart(h.t,[{v:h.cpu,c:B,n:'%'}],'CPU',v=>v.toFixed(0)+'%',100)].join('')}catch(e){}}
+document.getElementById('t24').onclick=()=>{range='24h';sel();history()};document.getElementById('t7').onclick=()=>{range='7d';sel();history()};
+function sel(){document.getElementById('t24').className=range=='24h'?'on':'';document.getElementById('t7').className=range=='7d'?'on':''}
+async function tick(){try{const r=await fetch('/api',{cache:'no-store'});render(await r.json());document.getElementById('err').style.display='none'}catch(e){document.getElementById('err').style.display='block'}}
+tick();history();setInterval(tick,5000);setInterval(history,60000);
+</script></body></html>

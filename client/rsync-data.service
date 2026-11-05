@@ -1,0 +1,10 @@
+[Unit]
+Description=rsync snapshot backup of /data and /etc to WD My Cloud (NFS)
+After=network-online.target remote-fs.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rsync-backup.sh
+Nice=10
+IOSchedulingClass=idle
