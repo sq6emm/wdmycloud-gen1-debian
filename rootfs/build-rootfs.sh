@@ -36,8 +36,8 @@ ln -sf /usr/share/zoneinfo/UTC "$R/etc/localtime"; echo UTC > "$R/etc/timezone"
 cp -a /work/rootfs/overlay/. "$R/"
 # modules from our kernel
 mkdir -p "$R/lib/modules"; tar -C "$R/lib/modules" -xJf /work/out/modules.tar.xz
-# sshd: root login with password allowed (the firewall limits it to private networks); no host keys in the image,
-# Debian's sshd-keygen.service generates them on first boot
+# sshd: root login with password allowed (the firewall limits it to private networks); no host keys in the image:
+# the overlay's ssh.service.d/hostkeys.conf runs ssh-keygen -A before sshd starts (sshd-keygen.service is enabled too)
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' "$R/etc/ssh/sshd_config"
 rm -f "$R"/etc/ssh/ssh_host_*
 # default password, change forced at first login
@@ -46,7 +46,7 @@ chroot "$R" chage -d 0 root
 # machine-id is generated on first boot
 : > "$R/etc/machine-id"; rm -f "$R/var/lib/dbus/machine-id"
 # services
-chroot "$R" systemctl enable serial-getty@ttyS0.service ssh.service chrony.service rsync.service smartmontools.service \
+chroot "$R" systemctl enable serial-getty@ttyS0.service ssh.service sshd-keygen.service chrony.service rsync.service smartmontools.service \
   nftables.service nas-status.service mdmonitor.service >/dev/null 2>&1 || true
 chroot "$R" systemctl disable apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
 mkdir -p "$R/srv/data" "$R/var/log/journal"
