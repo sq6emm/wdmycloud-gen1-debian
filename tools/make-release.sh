@@ -8,4 +8,6 @@ for f in uImage installer.uRamdisk boot-install.scr boot.scr rootfs.img.xz recov
 done
 cp /work/tools/install.sh /work/recovery/recover.sh "$D/"
 (cd "$D" && sha256sum uImage installer.uRamdisk boot-install.scr boot.scr rootfs.img.xz recovery startup.sh modules.tar.xz > SHA256SUMS)
+# the container runs as root; hand the outputs back to the user who owns the checkout
+chown -R --reference=/work/build.sh /work/out 2>/dev/null || true
 ls -la "$D"; echo RELEASE_OK
