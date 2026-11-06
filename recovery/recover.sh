@@ -20,7 +20,7 @@ log-dhcp
 log-facility=-
 CONF
 cat > "$T/run.sh" <<RUN
-apk add -q dnsmasq nmap >/dev/null
+apk add -q dnsmasq nmap nmap-nping >/dev/null
 dnsmasq -d -C /etc/dnsmasq.conf &
 nping -e $IFACE --dest-mac $MAC -c 900 --delay 1s --icmp --icmp-type echo --icmp-code 0 --data-string WD-ICMP-BEACON 255.255.255.255 >/dev/null &
 wait
