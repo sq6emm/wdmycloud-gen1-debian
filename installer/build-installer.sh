@@ -9,8 +9,8 @@ rm -rf "$R" && cp -a "$K/initramfs" "$R"
 install -m 755 /work/installer/init "$R/init"
 REL=$(cat /work/out/kernel.release)
 for m in phy-ls1024a-serdes usb-storage uas; do
-  f=$(find /work/work/modinstall/lib/modules/$REL -name "$m.ko*" | head -1); [ -n "$f" ] || { echo "module $m not found"; exit 1; }
-  cp -f "$f" "$R/lib/modules/$m.ko"
+  f=$(find /work/work/modinstall/lib/modules/$REL -name "$m.ko*" | head -1)
+  if [ -n "$f" ]; then cp -f "$f" "$R/lib/modules/$m.ko"; else rm -f "$R/lib/modules/$m.ko"; echo "$m: built into this kernel, no module needed"; fi
 done
 (cd "$R" && find . | cpio -o -H newc 2>/dev/null | pigz -11 > /work/work/installer.cpio.gz)
 mkimage -A arm -O linux -T ramdisk -C none -a 0x04008000 -e 0x04008000 -n "wdmycloud-installer" \
