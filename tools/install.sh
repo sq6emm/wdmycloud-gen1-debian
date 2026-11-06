@@ -13,7 +13,7 @@ grep -q "sq" /proc/cmdline 2>/dev/null && echo "model=sq (My Cloud gen1): OK" ||
 for p in 1 2 3 4 5 6 7 8; do [ -b /dev/sda$p ] || { echo "/dev/sda$p missing: unexpected partition layout"; exit 1; }; done
 grep -q "^md0 " /proc/mdstat || { echo "no md0: unexpected RAID layout"; exit 1; }
 mountpoint -q "$DATA" || { echo "$DATA is not mounted"; exit 1; }
-echo "== verifying checksums"; sha256sum -c SHA256SUMS
+echo "== verifying checksums"; grep -E " (uImage|installer\.uRamdisk|boot-install\.scr|boot\.scr|rootfs\.img\.xz)$" SHA256SUMS | sha256sum -c -
 echo "== staging on $DATA/wdmycloud-install"
 D="$DATA/wdmycloud-install"; rm -rf "$D"; mkdir -p "$D/stock-backup"
 cp rootfs.img.xz boot.scr SHA256SUMS "$D/"
