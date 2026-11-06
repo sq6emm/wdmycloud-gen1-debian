@@ -19,6 +19,7 @@ Stages and outputs (all under `out/`):
 | recovery | `recovery/build-recovery.sh` | `recovery`, `startup.sh` | second kernel build (`O=`) with the rescue initramfs embedded |
 | rootfs | `rootfs/build-rootfs.sh` | `rootfs.img.xz` | debootstrap minbase + `rootfs/packages.txt` + `rootfs/overlay/`, ext3 image sized to md0 (1999808 KiB) |
 | release | `tools/make-release.sh` | `out/release/<version>/` | everything above + `install.sh`, `recover.sh`, `SHA256SUMS` |
+| check | `tools/check-release.sh` | | image headers, sizes, rootfs contents, checksums |
 
 A full build takes about 30 minutes on a 32-core machine (two kernel builds and a debootstrap under qemu).
 

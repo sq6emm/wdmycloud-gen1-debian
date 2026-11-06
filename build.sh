@@ -7,7 +7,8 @@
 #   ./build.sh installer   -> out/installer.uRamdisk           (needs kernel)
 #   ./build.sh recovery    -> out/recovery                     (needs kernel)
 #   ./build.sh rootfs      -> out/rootfs.img.xz                (needs kernel)
-#   ./build.sh release     -> out/release/<version>/ with SHA256SUMS, install.sh and the docs
+#   ./build.sh release     -> out/release/<version>/ with SHA256SUMS, install.sh and recover.sh
+#   ./build.sh check       -> sanity checks on out/ (headers, sizes, rootfs contents)
 #   ./build.sh all         -> all of the above
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -24,8 +25,9 @@ stage() {
     recovery)  run recovery/build-recovery.sh ;;
     rootfs)    run rootfs/build-rootfs.sh --privileged ;;   # debootstrap: chroot + mknod + binfmt
     release)   run tools/make-release.sh ;;
+    check)     run tools/check-release.sh ;;
     all)       for s in kernel bootscr installer recovery rootfs release; do stage $s; done ;;
-    *) echo "usage: $0 {kernel|bootscr|installer|recovery|rootfs|release|all}"; exit 1 ;;
+    *) echo "usage: $0 {kernel|bootscr|installer|recovery|rootfs|release|check|all}"; exit 1 ;;
   esac
 }
 stage "${1:-all}"
