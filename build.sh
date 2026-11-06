@@ -15,7 +15,7 @@ IMAGE=wdmycloud-build
 VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || date +%Y%m%d)}
 mkdir -p out work
 docker image inspect $IMAGE >/dev/null 2>&1 || docker build -t $IMAGE .
-run() { docker run --rm --name wdmycloud-build-$1 -v "$PWD":/work -w /work -e VERSION="$VERSION" "${@:2}" $IMAGE bash "$1"; }
+run() { local n; n=$(basename "$1" .sh); docker run --rm --name "wdmycloud-build-$n" -v "$PWD":/work -w /work -e VERSION="$VERSION" "${@:2}" $IMAGE bash "$1"; }
 stage() {
   case $1 in
     kernel)    run kernel/build-kernel.sh ;;

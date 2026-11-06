@@ -3,3 +3,4 @@
 *.img
 *.img.xz
 __pycache__/
+build.log
