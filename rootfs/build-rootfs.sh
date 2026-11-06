@@ -11,7 +11,8 @@ HOSTNAME_=${HOSTNAME_:-wdmycloud}
 MIRROR=${MIRROR:-http://deb.debian.org/debian}
 PKGS=$(grep -v '^#' /work/rootfs/packages.txt | grep -v '^$' | paste -sd, -)
 [ -f /work/out/modules.tar.xz ] || { echo "run kernel first"; exit 1; }
-[ -e /proc/sys/fs/binfmt_misc/qemu-arm ] || echo "WARNING: no qemu-arm binfmt on the host; second stage will fail"
+# qemu-user binfmt must be registered on the host (docker run --privileged --rm tonistiigi/binfmt --install arm);
+# the second stage fails loudly if it is not.
 
 rm -rf "$R"
 debootstrap --arch=armhf --foreign --variant=minbase --include="$PKGS" trixie "$R" "$MIRROR"

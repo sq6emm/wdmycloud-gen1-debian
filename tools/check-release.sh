@@ -29,8 +29,9 @@ chk "no ssh host keys in image"                            '! ls_f /etc/ssh | gr
 chk "machine-id empty"                                     '[ -z "$(cat_f /etc/machine-id)" ]'
 chk "kernel modules match uImage release"                  'ls_f /lib/modules | grep -q "$(cat $D/kernel.release)"'
 chk "modules.dep present"                                  'ls_f "/lib/modules/$(cat $D/kernel.release)" | grep -q modules.dep'
+wants() { for d in multi-user.target.wants sysinit.target.wants getty.target.wants; do ls_f "/etc/systemd/system/$d"; done; }
 for u in ssh.service chrony.service rsync.service smartmontools.service nftables.service nas-status.service serial-getty@ttyS0.service; do
-  chk "enabled: $u" 'ls_f /etc/systemd/system/multi-user.target.wants /etc/systemd/system/getty.target.wants 2>/dev/null | grep -q "'"$u"'"'
+  chk "enabled: $u" 'wants | grep -q "'"$u"'"'
 done
 chk "sshd PermitRootLogin yes"                             'cat_f /etc/ssh/sshd_config | grep -q "^PermitRootLogin yes"'
 chk "nftables.conf, rsyncd.conf, smartd.conf, nas-status present" 'ls_f /etc | grep -q nftables.conf && ls_f /etc | grep -q rsyncd.conf && ls_f /usr/local/bin | grep -q nas-status.py'
