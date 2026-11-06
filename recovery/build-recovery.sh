@@ -7,6 +7,10 @@ set -euo pipefail
 K=/work/work/MCG1-6.18; R=/work/work/recovery-root
 [ -f "$K/.config" ] || { echo "run kernel first"; exit 1; }
 rm -rf "$R" && cp -a "$K/initramfs" "$R"
+# The port's rescue init assembles with --scan, which names the array md127 and, with 0.90 metadata, writes that
+# preferred minor into the superblock: the next normal boot then has no /dev/md0 and panic-loops. Assemble as md0.
+sed -i 's#/sbin/mdadm --assemble --scan --auto=yes#/sbin/mdadm --assemble --run --update=super-minor /dev/md0 /dev/sda1 /dev/sda2#' "$R/init"
+grep -q "update=super-minor" "$R/init" || { echo "rescue init: mdadm line not found, check upstream initramfs/init"; exit 1; }
 REL=$(cat /work/out/kernel.release)
 for m in phy-ls1024a-serdes usb-storage uas; do
   f=$(find /work/work/modinstall/lib/modules/$REL -name "$m.ko*" | head -1)

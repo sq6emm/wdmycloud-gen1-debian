@@ -49,7 +49,7 @@ done
 cat /proc/partitions
 
 log "assembling /dev/md0 from sda1+sda2"
-mdadm --assemble --run /dev/md0 /dev/sda1 /dev/sda2 >/dev/null 2>&1 || mdadm --assemble --scan --auto=yes >/dev/null 2>&1
+mdadm --assemble --run --update=super-minor /dev/md0 /dev/sda1 /dev/sda2 >/dev/null 2>&1
 [ -b /dev/md0 ] || fail "/dev/md0 did not assemble"
 MDSIZE=$(cat /sys/block/md0/size)
 log "md0 size: $MDSIZE sectors"

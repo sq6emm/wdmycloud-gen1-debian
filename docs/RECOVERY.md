@@ -34,7 +34,7 @@ Note: the board asks for `startup.sh` at the TFTP root, not inside any directory
 ## Inside the recovery shell
 
 ```sh
-mdadm --assemble --run /dev/md0 /dev/sda1 /dev/sda2
+mdadm --assemble --run --update=super-minor /dev/md0 /dev/sda1 /dev/sda2   # as md0, never md127: 0.90 metadata remembers the minor
 mkdir -p /mnt/data && mount /dev/sda4 /mnt/data          # your data partition
 ls /mnt/data/wdmycloud-install.done/stock-backup/        # sda5.img sda6.img sda7.img sda8.img (from install.sh)
 ```
