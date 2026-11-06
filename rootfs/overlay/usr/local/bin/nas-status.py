@@ -154,8 +154,8 @@ def nfs_clients():
             cl.append({"address": addr.group(1).rsplit(":", 1)[0] if addr else d, "name": (name.group(1) if name else "").strip()[:40], "minor": mv.group(1) if mv else "?"})
     return cl
 
-FIRMWARE_REPO = "https://github.com/sq6emm/wdmycloud-gen1-debian"
-FIRMWARE_BRANCH = "main"
+FIRMWARE_REPO = "https://github.com/sq6emm/MCG1-6.18"
+FIRMWARE_BRANCH = "pfe-offloads"
 UPSTREAM_REPO = "https://github.com/symops/MCG1-6.18"
 
 def device_info():
@@ -363,7 +363,8 @@ def alerts(d):
     if d["net_err"].get("delta", 0) > 0: add("warn", "network errors/drops increasing")
     if d["link"]["operstate"] == "up" and d["link"]["speed"] not in ("1000", ""): add("warn", "link at %s Mb/s" % d["link"]["speed"])
     if d["boot"]["last_planned"] is False: add("info", "last reboot was not a clean shutdown (crash or power loss)")
-    if d["mem"]["swap_total"] and d["mem"]["swap_used"] > 0.5 * d["mem"]["swap_total"]: add("warn", "swap more than half used")
+    # rsync's file list for millions of files lives in swap on a 228 MB box by design; only nearly-full swap is a problem
+    if d["mem"]["swap_total"] and d["mem"]["swap_used"] > 0.85 * d["mem"]["swap_total"]: add("warn", "swap nearly full (%d%%)" % (100 * d["mem"]["swap_used"] // d["mem"]["swap_total"]))
     return a
 
 def status():
