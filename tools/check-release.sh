@@ -11,8 +11,8 @@ done
 chk "uImage < 10 MiB (stock boot script window)"        '[ $(stat -c %s "$D/uImage") -lt 10485760 ]'
 chk "installer.uRamdisk < 10 MiB"                        '[ $(stat -c %s "$D/installer.uRamdisk") -lt 10485760 ]'
 chk "recovery < 16 MiB"                                  '[ $(stat -c %s "$D/recovery") -lt 16777216 ]'
-chk "boot.scr is 1 MiB with barebox env magic"           '[ $(stat -c %s "$D/boot.scr") -eq 1048576 ] && [ "$(head -c4 "$D/boot.scr" | xxd -p)" = "79ba8f79" ]'
-chk "boot-install.scr is 1 MiB with barebox env magic"   '[ $(stat -c %s "$D/boot-install.scr") -eq 1048576 ] && [ "$(head -c4 "$D/boot-install.scr" | xxd -p)" = "79ba8f79" ]'
+chk "boot.scr is 1 MiB with barebox env magic"           '[ $(stat -c %s "$D/boot.scr") -eq 1048576 ] && [ "$(head -c4 "$D/boot.scr" | od -An -tx1 | tr -d " \n")" = "79ba8f79" ]'
+chk "boot-install.scr is 1 MiB with barebox env magic"   '[ $(stat -c %s "$D/boot-install.scr") -eq 1048576 ] && [ "$(head -c4 "$D/boot-install.scr" | od -An -tx1 | tr -d " \n")" = "79ba8f79" ]'
 echo "== rootfs"
 IMG=/work/work/rootfs.img
 [ -f "$IMG" ] || { xz -dk -c "$D/rootfs.img.xz" > "$IMG"; }
