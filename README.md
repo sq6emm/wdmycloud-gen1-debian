@@ -23,6 +23,14 @@ partition, see [RECOVERY.md](docs/RECOVERY.md) for the way back.
 - [BACKUP.md](docs/BACKUP.md) – nightly rsync snapshots from a Linux client
 - [BUILDING.md](docs/BUILDING.md) – reproducing every artifact with Docker
 
+## Status
+
+The kernel, root filesystem recipe and services are what the author's own My Cloud runs (installed by hand, step by
+step, before this pipeline existed). The one-shot path through `install.sh` and the installer initramfs is built
+from the same pieces but has not been exercised on hardware yet; treat the first release as a candidate and keep
+[RECOVERY.md](docs/RECOVERY.md) at hand. The data partition is never written by the installer, only the 2 GB system
+array and the boot partitions.
+
 ## What is in a release
 
 | file | what | goes to |
